@@ -27,7 +27,7 @@ server.get("/", function(req, res){
     res.render('login', {message: ''});
   };
 });
-// Query 1: 
+// Query 1(User Login): 
 server.post("/", function(req, res){
   if (req.cookies["user"] == undefined){
     con.connect(function(err) {
@@ -37,7 +37,7 @@ server.post("/", function(req, res){
         if (result.length == 1){
           if (result[0].userpassword == req.body.password){
             res.cookie("user", sessions.length);
-            sessions.push({name: result[0].customername, address: result[0].address, phone: result[0].userphone, username: result[0].username});
+            sessions.push({name: result[0].customername, address: result[0].address, phone: result[0].userphone, username: result[0].username, id: result[0].customerid});
             res.redirect("/products")
           } else {
             res.render("login", {message: "Password doesn't match!"});
@@ -51,7 +51,7 @@ server.post("/", function(req, res){
     res.redirect("/products");
   };
 });
-// Query 2: 
+// Query 2(Products): 
 server.get("/products", function(req, res){
   if (req.cookies["user"] === undefined){
     res.redirect("/");
@@ -65,8 +65,36 @@ server.get("/products", function(req, res){
     });
   };
 });
+// Query 3(User Cart):
+server.get("/cart", function(req, res){
+  if (req.cookies["user"] === undefined){
+    res.redirect("/");
+  } else {
+    con.connect(function(err) {
+      if (err) console.log(err);
+      con.query("select * from onlineshopping.shoppingcartitems where customerid="+sessions[req.cookies.user].id+" and bought=false", function (err, result, fields) {
+        if (err) console.log(err);
+        res.render("cart", {cart: result});
+      });
+    });
+  };
+});
+// Query 4(User add to Cart):
+server.get("/cart/add/:id/:name", function(req, res){
+  if (req.cookies["user"] === undefined){
+    res.redirect("/");
+  } else {
+    con.connect(function(err) {
+      if (err) console.log(err);
+      con.query(`insert into onlineshopping.shoppingcartitems values(${req.params.id}, '${req.params.name}', ${sessions[req.cookies.user].id}, ${sessions[req.cookies.user].id}, false)`, function (err, result, fields) {
+        if (err) console.log(err);
+        res.redirect("/products");
+      });
+    });
+  };
+});
 
-// Query 4: 
+// Query 5(User Payments): 
 server.get("/payments", function(req, res){
   con.connect(function(err){
     if (err) console.log(err);
@@ -82,30 +110,26 @@ server.get("/register", function(req, res){
 });
 
 server.get("/employees", function(req, res){
-  if (req.cookies.user !== undefined){
-    res.redirect("/products");
-  } else {
-    if (req.cookies.employee === undefined){
+  if (req.cookies.user == undefined) {
       res.render('employees', {message: ''});
     } else {
-      res.send("Welcome Employee");
+      res.redirect("/employees/dashboard");
     };
-  };
 });
-//Query 3: 
+//Query 6(Employee Login): 
 server.post("/employees", function(req, res){
-  if (req.cookies.user !== undefined){
-    res.redirect("/products");
+  if (req.cookies.user == undefined){
+    res.redirect("/employees");
   } else {
-    if (req.cookies.employee === undefined){
+    if (req.cookies.user === undefined){
       con.connect(function(err) {
         if (err) console.log(err);
         con.query("select * from onlineshopping.employees where username='"+req.body.email+"'", function (err, result, fields) {
           if (err) console.log(err);
           if (result.length == 1){
             if (result[0].password == req.body.password){
-              res.cookie("employee", sessions.length);
-              sessions.push({username: result[0].username, name: result[0].name});
+              res.cookie("user", sessions.length);
+              sessions.push({username: result[0].username, name: result[0].name, role: 'employee'});
               res.send("Welcome Employee!")
             } else {
               res.render("employees", {message: "Password doesn't match!"});
@@ -122,7 +146,7 @@ server.post("/employees", function(req, res){
 });
 
 server.get("/employees/dashboard", function(req, res){
-  res.send("Hello fellow employee!");
+  res.send(sessions[req.cookies.user]);
 });
 
 let port = 3000;
